@@ -15,9 +15,9 @@ class teleop(object):
         self.sub_joy   = rospy.Subscriber("joy", Joy , self.joy_callback , queue_size=1)
         self.pub_cmd   = rospy.Publisher("ctl_ref", Twist , queue_size=1  ) 
 
-        self.max_vel   = 4.0 # 40   #Max velocity set at 40 rad/s (2.16 m/s)(7.78 km/h)
-        self.max_volt  = 8   # Max voltage is set at 6 volts   
-        self.maxStAng  = 40  # Supposing +/- 40 degrees max for the steering angle
+        self.max_vel  = rospy.get_param('~max_vel',   6.0) # Max linear velocity (m/s)
+        self.max_volt = rospy.get_param('~max_volt',  8)   # Max voltage is set at 6 volts   
+        self.maxStAng = rospy.get_param('~max_angle', 40)  # Supposing +/- 40 degrees max for the steering angle
         self.cmd2rad   = -self.maxStAng*2*3.1416/360     
 
     ####################################### 
@@ -36,11 +36,10 @@ class teleop(object):
             
             #If right button is active       
             if (joy_msg.buttons[5]):   
-                
-                # Closed-loop velocity, Open-loop sterring
-                self.cmd_msg.linear.x  = propulsion_user_input * self.max_vel #[m/s]
+                # Fully Open-Loop
+                self.cmd_msg.linear.x  = propulsion_user_input * self.max_volt #[volts]
                 self.cmd_msg.angular.z = steering_user_input * self.cmd2rad
-                self.cmd_msg.linear.z  = 2  # Control mode 
+                self.cmd_msg.linear.z  = 1   #CtrlChoice
                 
             #If button A is active 
             elif(joy_msg.buttons[1]):   
@@ -61,8 +60,8 @@ class teleop(object):
             #If button x is active 
             elif(joy_msg.buttons[0]):   
                 
-                # Closed-loop position, closed-loop sterring
-                self.cmd_msg.linear.x  = propulsion_user_input # [m]
+                # Closed-loop velocity closed-loop sterring
+                self.cmd_msg.linear.x  = propulsion_user_input * self.max_vel #[m/s]
                 self.cmd_msg.angular.z = steering_user_input # [m]
                 self.cmd_msg.linear.z  = 6  # Control mode
                 
@@ -82,6 +81,11 @@ class teleop(object):
                 self.cmd_msg.angular.z = 0
                 self.cmd_msg.linear.z  = 0 # Control mode
                 
+            #If both joy pushed
+            elif(joy_msg.buttons[11] and joy_msg.buttons[12]):
+                # Joystick disabled!
+                return;
+                
             #If bottom arrow is active
             elif(joy_msg.axes[5]):
                 
@@ -89,20 +93,21 @@ class teleop(object):
                 self.cmd_msg.linear.x  = 0
                 self.cmd_msg.angular.z = 0
                 self.cmd_msg.linear.z  = 0 # Control mode
-            
+
+            # Defaults operation
             # No active button
             else:
-                # Fully Open-Loop
-                self.cmd_msg.linear.x  = propulsion_user_input * self.max_volt #[volts]
+                # Closed-loop velocity, Open-loop sterring
+                self.cmd_msg.linear.x  = propulsion_user_input * self.max_vel #[m/s]
                 self.cmd_msg.angular.z = steering_user_input * self.cmd2rad
-                self.cmd_msg.linear.z  = 1   #CtrlChoice
+                self.cmd_msg.linear.z  = 0  # Control mode
         
         # Deadman is un-pressed
         else:
             
             self.cmd_msg.linear.x = 0 
             self.cmd_msg.linear.y = 0
-            self.cmd_msg.linear.z = 0            
+            self.cmd_msg.linear.z = -1            
             self.cmd_msg.angular.x = 0
             self.cmd_msg.angular.y = 0
             self.cmd_msg.angular.z = 0 

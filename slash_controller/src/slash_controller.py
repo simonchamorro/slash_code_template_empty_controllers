@@ -21,16 +21,16 @@ class slash_controller(object):
         
         # Timer
         self.dt         = 0.05
-        self.timer      = rospy.Timer( rospy.Duration( self.dt ), self.timed_controller )
+        #self.timer      = rospy.Timer( rospy.Duration( self.dt ), self.timed_controller )
         
         # Paramters
-        
-        # Controller
-        self.k1        = 0.0
-        self.k2        = 0.0
-        self.k0        = 0.0
-        
+
+        # Controller        
         self.steering_offset = 0.15
+        
+        self.K_autopilot =  None # TODO: DESIGN LQR
+    
+        self.K_parking   =  None # TODO: DESIGN PLACEMENT DE POLES
         
         # Memory
         
@@ -61,7 +61,7 @@ class slash_controller(object):
         self.laser_dy_fill = 0.9 * self.laser_dy_fill + 0.1 * (self.laser_y - self.laser_y_old) / self.dt
         self.laser_y_old   = self.laser_y        
 
-        if (self.high_level_mode == 0 ):
+        if (self.high_level_mode < 0 ):
             # Full stop mode
             self.propulsion_cmd = 0  # Command sent to propulsion
             self.arduino_mode   = 0  # Control mode
@@ -76,8 +76,9 @@ class slash_controller(object):
                 self.propulsion_cmd = self.propulsion_ref
                 self.arduino_mode   = 1  
                 self.steering_cmd   = self.steering_ref  
-                
-            elif ( self.high_level_mode == 2 ):
+            
+            # For compatibility mode 0 needs to be closed-loop velocity
+            elif ( self.high_level_mode == 0 ):
                 # Closed-loop velocity on arduino
                 self.propulsion_cmd = self.propulsion_ref
                 self.arduino_mode   = 2  
@@ -104,15 +105,17 @@ class slash_controller(object):
                 # y = ???
                 # r = 0
                 # u = [ servo_cmd , prop_cmd ]
-            
-                y = np.array([ 0 , 0 ])
-                r = 0
+
+                # TODO: COMPLETEZ LE CONTROLLER
+                y = None
+                r = None
                 
-                u = self.autopilot1( y , r )
-                
-                self.steering_cmd   = u[0]
-                self.propulsion_cmd = u[1]
-                self.arduino_mode   = 0 # Mode ??? on arduino
+                u = self.controller1( y , r )
+
+                self.steering_cmd   = u[1] + self.steering_offset
+                self.propulsion_cmd = u[0]     
+                self.arduino_mode   = 0 # TODO Mode ??? on arduino
+
                 
             elif ( self.high_level_mode == 6 ):
                 
@@ -123,33 +126,37 @@ class slash_controller(object):
                 # r = 0
                 # u = [ servo_cmd , prop_cmd ]
             
-                y = np.array([ 0 , 0 ])
-                r = self.propulsion_ref
+                # TODO: COMPLETEZ LE CONTROLLER
+                y = None
+                r = None
                 
-                u = self.autopilot2( y , r )
-                
-                self.steering_cmd   = u[0]
-                self.propulsion_cmd = u[1]
-                self.arduino_mode   = 0 # Mode ??? on arduino
-            
+                u = self.controller2( y , r )
+
+                self.steering_cmd   = u[1] + self.steering_offset
+                self.propulsion_cmd = u[0] 
+                self.arduino_mode   = 0 # TODO Mode ??? on arduino
         
         self.send_arduino()
 
         
     #######################################
-    def autopilot1(self, y , r):
-       
+    def controller1(self, y , r):
+
         # Control Law TODO
-        
+
         u = np.array([ 0 , 0 ])
+        
+        #u = np.dot( self.K_autopilot , (r - y) )
         
         return u
 
     #######################################
-    def autopilot2(self, y , r ):
+    def controller2(self, y , r ):
 
         # Control Law TODO
-        
+
+        #u = np.dot( self.K_parking , (r - y) )
+
         u = np.array([ 0 , 0 ])
         
         return u
@@ -191,6 +198,9 @@ class slash_controller(object):
         # Read feedback from arduino
         self.velocity       = msg.data[1]
         self.position       = msg.data[0]
+
+        # timing here
+        self.timed_controller( None )
         
         
     ####################################### 
