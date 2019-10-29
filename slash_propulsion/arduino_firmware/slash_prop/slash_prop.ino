@@ -13,6 +13,11 @@
 #include <ros.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <geometry_msgs/Twist.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/MagneticField.h>
+
+// For version including 
+#include "MPU9250.h" 
 
 ///////////////////////////////////////////////////////////////////
 // Init I/O
@@ -22,17 +27,20 @@
 // Sterring servo-motor
 Servo steeringServo;
 
+// IMU
+MPU9250 imu(Wire, 0x68);
+
 // ROS
 ros::NodeHandle  nodeHandle;
 
 //Publisher 
-const int prop_sensors_msg_length = 8;
+const int prop_sensors_msg_length = 18;
 float prop_sensors_data[ prop_sensors_msg_length ];
 std_msgs::Float32MultiArray prop_sensors_msg;
 ros::Publisher prop_sensors_pub("prop_sensors", &prop_sensors_msg);
 
 // Serial Communication
-const int baud_rate = 57600;
+const unsigned long baud_rate = 115200;
 
 // Slave Select pins for the encoder
 const int slaveSelectEnc = 45;
@@ -50,16 +58,15 @@ const int dri_dir_pin     = 42; //
 
 // Controller
 
-// TODO : VOUS DEVEZ DETEMINEZ DE BONS PARAMETRES SUIVANTS
-const float filter_rc  =  0.5;
-const float vel_kp     =  1.0;
-const float vel_ki     =  0.0;
+//TODO: VOUS DEVEZ DETERMINEZ DES BONS PARAMETRES SUIVANTS
+const float filter_rc  =  0.1;
+const float vel_kp     =  1.0; 
+const float vel_ki     =  0.0; 
 const float vel_kd     =  0.0;
-const float pos_kp     =  1.0;
+const float pos_kp     =  1.0; 
 const float pos_kd     =  0.0;
 const float pos_ki     =  0.0; 
 const float pos_ei_sat =  10000.0; 
-// FIN DU TODO
 
 // Loop period 
 const unsigned long time_period_low   = 2;  // 500 Hz for internal PID loop
@@ -305,11 +312,10 @@ void ctl(){
   
   // Velocity computation
 
-  // TODO: COMPLETEZ LA DERIVEE FILTREE SUIVANTES
+  //TODO: VOUS DEVEZ COMPLETEZ LA DERIVEE FILTRE ICI
   float vel_raw = (enc_now - enc_old) * tick2m / time_period_low * 1000;
   float alpha   = 0;
-  float vel_fil = vel_raw;    // Filtre a completer
-  // FIN DU TODO
+  float vel_fil = vel_raw;    // Filter
   
   // Propulsion Controllers
   
@@ -341,12 +347,11 @@ void ctl(){
     
     float vel_ref, vel_error;
 
-    // TODO : ASSERVISSEMENT VITESSE
+    //TODO: VOUS DEVEZ COMPLETEZ LE CONTROLLEUR SUIVANT
     vel_ref       = dri_ref; 
     vel_error     = 0;
     vel_error_int = 0;
     dri_cmd       = 0;
-    // FIN DU TODO 
     
     dri_pwm    = cmd2pwm( dri_cmd ) ;
 
@@ -358,11 +363,18 @@ void ctl(){
     
     float pos_ref, pos_error, pos_error_ddt;
 
-    // TODO : ASSERVISSEMENT VITESSE
+    //TODO: VOUS DEVEZ COMPLETEZ LE CONTROLLEUR SUIVANT
     pos_ref       = dri_ref; 
-    // Anti wind-up??
+    pos_error     = 0;
+    pos_error_ddt = 0;
+    pos_error_int = 0;
+    
+    // Anti wind-up
+    if ( pos_error_int > pos_ei_sat ){
+      pos_error_int = pos_ei_sat;
+    }
+    
     dri_cmd = 0;
-    // FIN DU TODO
     
     dri_pwm = cmd2pwm( dri_cmd ) ;
   }
@@ -393,10 +405,7 @@ void ctl(){
   
   //Update memory variable
   enc_old = enc_now;
-
-  // TODO UPDATE FILTER MEMORY
-  vel_old = vel_raw;
-  // FIN DU TODO
+  vel_old = vel_fil;
 }
 
 
@@ -415,7 +424,7 @@ void setup(){
   pinMode(dri_pwm_pin, OUTPUT);
   
   // Init Communication
-  Serial.begin(baud_rate);
+  nodeHandle.getHardware()->setBaud(baud_rate);
 
   // Init and Clear Encoders
   initEncoder();    
@@ -429,6 +438,13 @@ void setup(){
   // Initialize Steering and drive cmd to neutral
   steeringServo.write(pwm_zer_ser) ;
   set_pwm(0);
+
+  // Initialize IMU
+  imu.begin();
+  imu.setAccelRange(MPU9250::ACCEL_RANGE_2G);
+  imu.setGyroRange(MPU9250::GYRO_RANGE_250DPS);
+  imu.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_41HZ);
+  imu.setSrd(9); //100 Hz update rate
   
   //
   delay(3000) ;
@@ -460,7 +476,8 @@ void loop(){
   // Sync with ROS high-level controller
   ///////////////////////////////////////
 
-  if (( time_now - time_last_high ) > time_period_high ) {
+  unsigned long dt = time_now - time_last_high;
+  if (dt > time_period_high ) {
 
     // Feedback loop
     prop_sensors_data[0] = pos_now; // wheel position in m
@@ -471,20 +488,25 @@ void loop(){
     prop_sensors_data[3] = dri_cmd; // drive set point in volts
     prop_sensors_data[4] = dri_pwm; // drive set point in pwm
     prop_sensors_data[5] = enc_now; // raw encoder counts
-    prop_sensors_data[6] = 0;
+    prop_sensors_data[6] = ser_ref; // steering angle
     prop_sensors_data[7] = 0;
+    prop_sensors_data[8] = (float)dt;
+
+    // Read IMU
+    imu.readSensor();
+    prop_sensors_data[9] = imu.getAccelX_mss();
+    prop_sensors_data[10] = imu.getAccelY_mss();
+    prop_sensors_data[11] = imu.getAccelZ_mss();
+    prop_sensors_data[12] = imu.getGyroX_rads();
+    prop_sensors_data[13] = imu.getGyroY_rads();
+    prop_sensors_data[14] = imu.getGyroZ_rads();
+    prop_sensors_data[15] = imu.getMagX_uT();
+    prop_sensors_data[16] = imu.getMagY_uT();
+    prop_sensors_data[17] = imu.getMagZ_uT();
     
     prop_sensors_msg.data        = &prop_sensors_data[0];
     prop_sensors_msg.data_length = prop_sensors_msg_length;
     prop_sensors_pub.publish( &prop_sensors_msg );
-    
-    // Read IMU ???
-    
-    //TODO
-    
-    // Publish IMU
-    
-    //TODO
     
     // Process ROS Events
     nodeHandle.spinOnce();
