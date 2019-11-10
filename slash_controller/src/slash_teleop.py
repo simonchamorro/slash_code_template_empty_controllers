@@ -55,15 +55,16 @@ class teleop(object):
                 # Autopilot
                 # Closed-loop velocity, closed-loop steering sterring
                 self.cmd_msg.linear.x  = 2.0 #[m/s]
-                self.cmd_msg.angular.z = 0.0 # [m]
+                self.cmd_msg.angular.z = 0.0 
                 self.cmd_msg.linear.z  = 5  # Control mode
                 
             #If button x is active 
             elif(joy_msg.buttons[0]):   
                 
+                # Autopilot parking
                 # Closed-loop velocity closed-loop sterring
-                self.cmd_msg.linear.x  = propulsion_user_input * self.max_vel #[m/s]
-                self.cmd_msg.angular.z = steering_user_input # [m]
+                self.cmd_msg.linear.x  = 2.0 #[m]
+                self.cmd_msg.angular.z = 0.0
                 self.cmd_msg.linear.z  = 6  # Control mode
                 
             #If button y is active 

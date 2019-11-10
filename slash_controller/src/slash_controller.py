@@ -26,12 +26,16 @@ class slash_controller(object):
         # Paramters
 
         # Controller        
-        self.steering_offset = 0.15
+        self.steering_offset = 0.0
         
         self.K_autopilot =  np.array([[0.0, 0.0, 8.2],
                                       [1.0, 1.3, 0.0]])
     
-        self.K_parking   =  None # TODO: DESIGN PLACEMENT DE POLES
+        self.K_parking   =  np.array([[1.00, 0.00, 0.01],
+                                      [0.00, 0.10, 0.30]])
+
+        self.N_parking   =  np.array([[1.00, 0.00],
+                                      [0.00, 0.09]])
         
         # Memory
         
@@ -114,22 +118,16 @@ class slash_controller(object):
                 
             elif ( self.high_level_mode == 6 ):
                 
-                #TODO
-                
                 # Auto-pilot # 2
-                # y = ??
-                # r = 0
-                # u = [ servo_cmd , prop_cmd ]
-            
-                # TODO: COMPLETEZ LE CONTROLLER
-                y = None
-                r = None
+                y = np.array([[-self.position], [-self.laser_y], [self.laser_theta]])
+                r = np.array([[self.propulsion_ref], [self.y_ref], [self.steering_ref]])
                 
+                # u = [ servo_cmd , prop_cmd ]                
                 u = self.controller2( y , r )
 
                 self.steering_cmd   = u[1] + self.steering_offset
                 self.propulsion_cmd = u[0] 
-                self.arduino_mode   = 0 # TODO Mode ??? on arduino
+                self.arduino_mode   = 2 # Mode 2 on arduino: PID controller
         
         self.send_arduino()
 
@@ -137,6 +135,7 @@ class slash_controller(object):
     #######################################
     def controller1(self, y , r):
 
+        u = np.array([ 0 , 0 ])
         u = np.dot( self.K_autopilot , (r - y) )
         
         return u
@@ -144,11 +143,8 @@ class slash_controller(object):
     #######################################
     def controller2(self, y , r ):
 
-        # Control Law TODO
-
-        #u = np.dot( self.K_parking , (r - y) )
-
         u = np.array([ 0 , 0 ])
+        u = np.dot( self.K_parking , (r - y) )
         
         return u
 

@@ -409,7 +409,6 @@ void ctl(){
     vel_error_int = 0;
     pos_error_int = 0 ;
   }
-    
   ////////////////////////////////////////////////////////
   else {
     // reset integral actions
