@@ -17,7 +17,7 @@
 #include <sensor_msgs/MagneticField.h>
 
 // For version including 
-#include "MPU9250.h" 
+// #include "MPU9250.h" 
 
 ///////////////////////////////////////////////////////////////////
 // Init I/O
@@ -28,7 +28,7 @@
 Servo steeringServo;
 
 // IMU
-MPU9250 imu(Wire, 0x68);
+// MPU9250 imu(Wire, 0x68);
 
 // ROS
 ros::NodeHandle  nodeHandle;
@@ -58,8 +58,8 @@ const int dri_dir_pin     = 42; //
 
 // Controller
 
-//TODO: VOUS DEVEZ DETERMINEZ DES BONS PARAMETRES SUIVANTS
-const float filter_rc  =  0.1;
+//[Parameters]
+const float filter_rc  =  0.5;
 const float vel_kp     =  1.0; 
 const float vel_ki     =  0.0; 
 const float vel_kd     =  0.0;
@@ -67,6 +67,8 @@ const float pos_kp     =  1.0;
 const float pos_kd     =  0.0;
 const float pos_ki     =  0.0; 
 const float pos_ei_sat =  10000.0; 
+
+const float vel_k_autopilot = 8.2335;
 
 // Loop period 
 const unsigned long time_period_low   = 2;  // 500 Hz for internal PID loop
@@ -114,6 +116,10 @@ float vel_old   = 0;
 
 float vel_error_int = 0 ;
 float pos_error_int = 0;
+
+float vel_error_der = 0 ;
+float pos_error_der = 0;
+float last_vel_error = 0;
 
 // Loop timing
 unsigned long time_now       = 0;
@@ -347,11 +353,12 @@ void ctl(){
     
     float vel_ref, vel_error;
 
-    //TODO: VOUS DEVEZ COMPLETEZ LE CONTROLLEUR SUIVANT
     vel_ref       = dri_ref; 
-    vel_error     = 0;
-    vel_error_int = 0;
-    dri_cmd       = 0;
+    vel_error     = vel_ref - vel_fil;
+    vel_error_int += vel_error * time_last_low;
+    vel_error_der = (vel_error - last_vel_error)/time_last_low;
+    dri_cmd       = (vel_error * vel_kp) + (vel_error_int * vel_ki) + (vel_error_der * vel_kd);
+    last_vel_error = vel_error;
     
     dri_pwm    = cmd2pwm( dri_cmd ) ;
 
@@ -390,6 +397,19 @@ void ctl(){
     
     dri_pwm    = pwm_zer_dri ;
   }
+  //////////////////////////////////////////////////////
+  else if (ctl_mode == 5 ){
+    // Autopilot # 1
+    // Wall follower 2 m/s
+
+    dri_cmd    = (2.0 - vel_fil) * vel_k_autopilot;
+    dri_pwm    = cmd2pwm( dri_cmd );
+    
+    // reset integral actions
+    vel_error_int = 0;
+    pos_error_int = 0 ;
+  }
+    
   ////////////////////////////////////////////////////////
   else {
     // reset integral actions
@@ -440,11 +460,11 @@ void setup(){
   set_pwm(0);
 
   // Initialize IMU
-  imu.begin();
-  imu.setAccelRange(MPU9250::ACCEL_RANGE_2G);
-  imu.setGyroRange(MPU9250::GYRO_RANGE_250DPS);
-  imu.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_41HZ);
-  imu.setSrd(9); //100 Hz update rate
+  // imu.begin();
+  // imu.setAccelRange(MPU9250::ACCEL_RANGE_2G);
+  // imu.setGyroRange(MPU9250::GYRO_RANGE_250DPS);
+  // imu.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_41HZ);
+  // imu.setSrd(9); //100 Hz update rate
   
   //
   delay(3000) ;
@@ -493,16 +513,16 @@ void loop(){
     prop_sensors_data[8] = (float)dt;
 
     // Read IMU
-    imu.readSensor();
-    prop_sensors_data[9] = imu.getAccelX_mss();
-    prop_sensors_data[10] = imu.getAccelY_mss();
-    prop_sensors_data[11] = imu.getAccelZ_mss();
-    prop_sensors_data[12] = imu.getGyroX_rads();
-    prop_sensors_data[13] = imu.getGyroY_rads();
-    prop_sensors_data[14] = imu.getGyroZ_rads();
-    prop_sensors_data[15] = imu.getMagX_uT();
-    prop_sensors_data[16] = imu.getMagY_uT();
-    prop_sensors_data[17] = imu.getMagZ_uT();
+    // imu.readSensor();
+    // prop_sensors_data[9] = imu.getAccelX_mss();
+    // prop_sensors_data[10] = imu.getAccelY_mss();
+    // prop_sensors_data[11] = imu.getAccelZ_mss();
+    // prop_sensors_data[12] = imu.getGyroX_rads();
+    // prop_sensors_data[13] = imu.getGyroY_rads();
+    // prop_sensors_data[14] = imu.getGyroZ_rads();
+    // prop_sensors_data[15] = imu.getMagX_uT();
+    // prop_sensors_data[16] = imu.getMagY_uT();
+    // prop_sensors_data[17] = imu.getMagZ_uT();
     
     prop_sensors_msg.data        = &prop_sensors_data[0];
     prop_sensors_msg.data_length = prop_sensors_msg_length;

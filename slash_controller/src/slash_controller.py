@@ -28,7 +28,8 @@ class slash_controller(object):
         # Controller        
         self.steering_offset = 0.15
         
-        self.K_autopilot =  None # TODO: DESIGN LQR
+        self.K_autopilot =  np.array([[0.0, 0.0, 8.2],
+                                      [1.0, 1.3, 0.0]])
     
         self.K_parking   =  None # TODO: DESIGN PLACEMENT DE POLES
         
@@ -37,6 +38,7 @@ class slash_controller(object):
         # References Inputs
         self.propulsion_ref  = 0
         self.steering_ref    = 0
+        self.y_ref           = 0
         self.high_level_mode = 0  # Control mode of this controller node
         
         # Ouput commands
@@ -97,24 +99,17 @@ class slash_controller(object):
                 self.steering_cmd   = 0  
                 
             elif ( self.high_level_mode == 5 ):
-                
-                #TODO
-                
+                                
                 # Auto-pilot # 1 
-                
-                # y = ???
-                # r = 0
-                # u = [ servo_cmd , prop_cmd ]
+                y = np.array([[-self.laser_y], [self.laser_theta], [self.velocity]])
+                r = np.array([[self.y_ref], [self.steering_ref], [self.propulsion_ref]])
 
-                # TODO: COMPLETEZ LE CONTROLLER
-                y = None
-                r = None
-                
+                # u = [ servo_cmd , prop_cmd ]
                 u = self.controller1( y , r )
 
                 self.steering_cmd   = u[1] + self.steering_offset
                 self.propulsion_cmd = u[0]     
-                self.arduino_mode   = 0 # TODO Mode ??? on arduino
+                self.arduino_mode   = 5 # Mode 5 on arduino: Autopilot
 
                 
             elif ( self.high_level_mode == 6 ):
@@ -142,11 +137,7 @@ class slash_controller(object):
     #######################################
     def controller1(self, y , r):
 
-        # Control Law TODO
-
-        u = np.array([ 0 , 0 ])
-        
-        #u = np.dot( self.K_autopilot , (r - y) )
+        u = np.dot( self.K_autopilot , (r - y) )
         
         return u
 
