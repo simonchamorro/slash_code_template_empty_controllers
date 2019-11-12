@@ -60,8 +60,8 @@ const int dri_dir_pin     = 42; //
 
 //[Parameters]
 const float filter_rc  =  0.5;
-const float vel_kp     =  1.0; 
-const float vel_ki     =  0.0; 
+const float vel_kp     =  0.8;
+const float vel_ki     =  4.21;
 const float vel_kd     =  0.0;
 const float pos_kp     =  1.0; 
 const float pos_kd     =  0.0;
@@ -114,8 +114,10 @@ float pos_now   = 0;
 float vel_now   = 0;
 float vel_old   = 0;
 
-float vel_error_int = 0 ;
+float vel_error_old = 0;
+float vel_error_int = 0;
 float pos_error_int = 0;
+float pos_error_old = 0;
 
 float vel_error_der = 0 ;
 float pos_error_der = 0;
@@ -355,10 +357,9 @@ void ctl(){
 
     vel_ref       = dri_ref; 
     vel_error     = vel_ref - vel_fil;
-    vel_error_int += vel_error * time_last_low;
-    vel_error_der = (vel_error - last_vel_error)/time_last_low;
-    dri_cmd       = (vel_error * vel_kp) + (vel_error_int * vel_ki) + (vel_error_der * vel_kd);
-    last_vel_error = vel_error;
+    vel_error_int += vel_error * time_period_low/1000.0;
+    dri_cmd       = vel_kp*vel_error + vel_ki*vel_error_int + vel_kd*((vel_error-vel_error_old)/(time_period_low/1000.0));
+    vel_error_old = vel_error;
     
     dri_pwm    = cmd2pwm( dri_cmd ) ;
 

@@ -30,6 +30,9 @@ class slash_controller(object):
         
         self.K_autopilot =  np.array([[0.0, 0.0, 8.2],
                                       [1.0, 1.3, 0.0]])
+
+        self.N_autopilot =  np.array([[0.00, 3.33],
+                                      [1.00, 0.00]])
     
         self.K_parking   =  np.array([[1.00, 0.00, 0.01],
                                       [0.00, 0.10, 0.30]])
@@ -119,15 +122,15 @@ class slash_controller(object):
             elif ( self.high_level_mode == 6 ):
                 
                 # Auto-pilot # 2
-                y = np.array([[-self.position], [-self.laser_y], [self.laser_theta]])
+                y = np.array([[self.position], [-self.laser_y], [self.laser_theta]])
                 r = np.array([[self.propulsion_ref], [self.y_ref], [self.steering_ref]])
-                
+
                 # u = [ servo_cmd , prop_cmd ]                
                 u = self.controller2( y , r )
 
                 self.steering_cmd   = u[1] + self.steering_offset
                 self.propulsion_cmd = u[0] 
-                self.arduino_mode   = 2 # Mode 2 on arduino: PID controller
+                self.arduino_mode   = 2  # Mode 2 on arduino: PID controller
         
         self.send_arduino()
 
